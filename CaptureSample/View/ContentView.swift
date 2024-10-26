@@ -11,19 +11,21 @@ import os
 private let logger = Logger(subsystem: "com.lychen.CaptureSample",
                             category: "ContentView")
 
-let accelerationThreshold = 0.02
+let accelerationThreshold = 0.05
 
 /// This is the root view for the app.
 struct ContentView: View {
     @ObservedObject var model: ARViewModel
-
+    
+    @State private var showCaptureSettingView = false
+    
     var body: some View {
+        
         ZStack{
             ZStack(alignment: .topLeading) {
                 ARViewContainer(model).edgesIgnoringSafeArea(.all)
                 ARViewTopPanel(model: model)
             }
-            .navigationBarBackButtonHidden(true)  /// navigationLink will automatically add a back button on the top scene
             
             ARViewBottomPanel(model: model)
             
@@ -38,8 +40,20 @@ struct ContentView: View {
             
             if model.state == .capturing1 || model.state == .capturing2 {
                 
-                if model.closestPoint == -1 {
-                    Text("Move the camera to the checkpoint")
+                if model.captureError == .distance {
+                    Text("Camera is too far")
+                        .foregroundColor(.white)
+                        .padding()
+                        .transition(.opacity)
+                }
+                else if model.captureError == .height {
+                    Text("Camera is too high/low")
+                        .foregroundColor(.white)
+                        .padding()
+                        .transition(.opacity)
+                }
+                else if model.captureError == .notAlign {
+                    Text("Camera direction does not align with the point")
                         .foregroundColor(.white)
                         .padding()
                         .transition(.opacity)
@@ -64,6 +78,12 @@ struct ARViewTopPanel: View {
         VStack {
             HStack {
                 VStack(alignment:.leading) {
+                    NavigationLink(destination: CaptureSettingView(model: model)) {
+                        Image(systemName: "gear.circle")
+                            .foregroundColor(Color.white)
+                            .frame(width: 30, height: 30)
+                    }
+                    
                     if let acceleration = model.getAcceleration() {
                         let text = String(format: "%.3f G", acceleration)
                         Text(text)
@@ -85,6 +105,7 @@ struct ARViewTopPanel: View {
                 }.padding()
             }
         }
+        .navigationBarHidden(true)
     }
 }
 
@@ -92,7 +113,7 @@ struct ARViewBottomPanel: View {
     @ObservedObject var model: ARViewModel
     @State private var showUploadView = false
     @State private var showCaptureGalleryView = false
-
+    
     
     var body: some View {
         VStack {
@@ -169,12 +190,30 @@ struct ARViewBottomPanel: View {
                     }
                 }
             }
-//            .padding()
             .padding(.horizontal, 20)
             .padding(.bottom, 10)
         }
     }
 }
+
+//
+//struct CaptureSettingButton: View {
+//    @ObservedObject var model: ARViewModel
+////    @Binding var showCaptureSettingView: Bool
+//    
+//    var body: some View {
+//        Button(action: {
+//            model.stopMonitoringAcceleration()
+////            self.showCaptureSettingView = true
+//
+//        }) {
+//            Image(systemName: "gear.circle")
+//                .foregroundColor(Color.white)
+//                .frame(width: 30, height: 30)
+//        }
+//        .buttonStyle(.plain)
+//    }
+//}
 
 struct CaptureButton: View {
     static let outerDiameter: CGFloat = 80
@@ -191,7 +230,7 @@ struct CaptureButton: View {
     }
     
     var body: some View {
-        let isDisalbeCapture = 
+        let isDisalbeCapture =
             (model.getAcceleration()! > accelerationThreshold) ||
             (model.closestPoint == -1)
         
@@ -234,14 +273,23 @@ struct DebugMessageButton: View {
             model.stopMonitoringAcceleration()
             //print("Anchor position: \(String(describing: model.anchorPosition))")
             //print("Camera position: \(String(describing: model.cameraPosition))")
-            print("firstHeight: \(String(describing: model.captureTrack?.firstHeight))")
-            print("SecnodHeight: \(String(describing: model.captureTrack?.secondHeight))")
-            
+//            print("firstHeight: \(String(describing: model.captureTrack?.firstHeight))")
+//            print("SecnodHeight: \(String(describing: model.captureTrack?.secondHeight))")
+            print("========== DEBUG ==========")
+            print("model.numOfCaptureTrack = \(model.numOfCaptureTrack)")
+            print("model.numOfCheckpoints = \(model.numOfCheckpoints)")
+            if(model.originAnchor != nil) {
+                print("Children of originAnchor: \(model.originAnchor!.children.map { $0.name })")
+            }
+            if(model.captureTrack != nil) {
+                print("Children of captureTrack: \(model.captureTrack!.children.map { $0.name })")
+            }
 
-            let size = model.calculateBoundingBoxSize()
-            print("Bounding box size: (\(size.x), \(size.y), \(size.z))")
+            //let size = model.calculateBoundingBoxSize()
+            //print("Bounding box size: (\(size.x), \(size.y), \(size.z))")
 //            print("originAnchor: \n \(model.originAnchor)")
 //            print("checkpoints:\n \(model.checkpoints)")
+            print("===========================")
         }) {
             Text("D")
                 .font(.system(size: 12))

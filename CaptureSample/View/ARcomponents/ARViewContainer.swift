@@ -43,6 +43,7 @@ struct ARViewContainer: UIViewRepresentable {
         
         viewModel.session = arView.session
         viewModel.arView = arView
+        viewModel.arConfiguration = configuration
         
         return arView
     }

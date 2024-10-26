@@ -35,6 +35,7 @@
 		D99FB2A62C7B97D600A78EA6 /* hemisphere.usdz in Resources */ = {isa = PBXBuildFile; fileRef = D99FB2A52C7B97D600A78EA6 /* hemisphere.usdz */; };
 		D99FB2AA2C80546500A78EA6 /* checkpoint.usdz in Resources */ = {isa = PBXBuildFile; fileRef = D99FB2A92C80546500A78EA6 /* checkpoint.usdz */; };
 		D9FA261E2CB3BCED00BFF79F /* MotionDetection.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9FA261D2CB3BCED00BFF79F /* MotionDetection.swift */; };
+		D9FA26202CC7D46700BFF79F /* CaptureSettingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9FA261F2CC7D46700BFF79F /* CaptureSettingView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -71,6 +72,7 @@
 		D99FB2A52C7B97D600A78EA6 /* hemisphere.usdz */ = {isa = PBXFileReference; lastKnownFileType = file.usdz; path = hemisphere.usdz; sourceTree = "<group>"; };
 		D99FB2A92C80546500A78EA6 /* checkpoint.usdz */ = {isa = PBXFileReference; lastKnownFileType = file.usdz; path = checkpoint.usdz; sourceTree = "<group>"; };
 		D9FA261D2CB3BCED00BFF79F /* MotionDetection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MotionDetection.swift; sourceTree = "<group>"; };
+		D9FA261F2CC7D46700BFF79F /* CaptureSettingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureSettingView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -172,6 +174,7 @@
 				C91EEE4A25EDA200009FD603 /* CaptureFoldersView.swift */,
 				C9BF999D25E07A5200707ADC /* CaptureGalleryView.swift */,
 				94A529B92C6B47ED0098679A /* UploadView.swift */,
+				D9FA261F2CC7D46700BFF79F /* CaptureSettingView.swift */,
 			);
 			path = View;
 			sourceTree = "<group>";
@@ -261,6 +264,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				D99FB28C2C6D18AB00A78EA6 /* ARViewModel.swift in Sources */,
+				D9FA26202CC7D46700BFF79F /* CaptureSettingView.swift in Sources */,
 				D99FB29E2C6D1AEC00A78EA6 /* Utils.swift in Sources */,
 				C91EEE4D25EDBE46009FD603 /* CaptureFolderState.swift in Sources */,
 				D99FB2942C6D196B00A78EA6 /* AppState.swift in Sources */,

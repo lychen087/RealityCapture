@@ -12,6 +12,8 @@ import RealityKit
 import SwiftUI
 import Combine
 
+var DEBUG = false  // if true, logger will print capture infomation in every frame
+
 private let logger = Logger(subsystem: "com.lychen.CaptureSample", category: "CaptureTrack")
 
 class CaptureTrack: Entity, HasAnchoring {
@@ -24,9 +26,8 @@ class CaptureTrack: Entity, HasAnchoring {
     
     var points: [ModelEntity] = []
     var index: Int = 0 // index of checkpoint
-//    var checkpoints: [Int: PointStatus] = [:]
 
-    var count: Int = 20
+    // var count: Int = 20
     var radius: Float = 0.21  // according to the size of bounding box
     var scale: Float = 0.02   // according to the size of bounding box
     
@@ -46,6 +47,9 @@ class CaptureTrack: Entity, HasAnchoring {
         
         super.init()
         
+        let numOfCheckpoints = model.numOfCheckpoints
+        let numOfCaptureTrack = model.numOfCaptureTrack
+        
         self.name = "CaptureTrack"
         
         let discMesh = MeshResource.generatePlane(width: 0.2, depth: 0.2, cornerRadius: 0.1)
@@ -53,39 +57,47 @@ class CaptureTrack: Entity, HasAnchoring {
         let discEntity = ModelEntity(mesh: discMesh, materials: [material])
         discEntity.position = anchorPosition + SIMD3<Float>(0, 0.01, 0)
         
-        Task {
-            await asyncLoadModelEntity(scale: self.scale);  // load hemiSphere.usdz
-            firstHeight = anchorPosition.y + 0.035
-            secondHeight = anchorPosition.y + self.hemisphereSize.y * 0.5
-            //logger.log("hemisphereSize.y = \(self.hemisphereSize.y)")
-            //logger.log("secondHeight = \(self.secondHeight)")
-            
-            createCheckPoints(center: anchorPosition, count: count, height: firstHeight, radiusScale: 1.0)
-            createCheckPoints(center: anchorPosition, count: count, height: secondHeight, radiusScale: 0.866)
-        }
+        logger.log("Init CaptureTrack")
+//        Task {
+//            logger.log("Init CaptureTrack:")
+//        }
     }
     
     required init() {
         fatalError("init Has Not Been Implemented")
     }
     
-    public func findNearestPoint(cameraPosition: SIMD3<Float>, anchorPosition: SIMD3<Float>) -> Int {
+    public func setup() async {
+        logger.log("asyncLoadModelEntity: Load hemisphere")
+        await asyncLoadModelEntity(scale: self.scale);  // load hemiSphere.usdz
+        
+        firstHeight = anchorPosition.y + 0.035
+        secondHeight = anchorPosition.y + self.hemisphereSize.y * 0.5
+        //logger.log("hemisphereSize.y = \(self.hemisphereSize.y)")
+        //logger.log("secondHeight = \(self.secondHeight)")
+
+        logger.log("createCheckPoints: Load checkpoints")
+        createCheckPoints(center: anchorPosition, count: model.numOfCheckpoints, height: firstHeight, radiusScale: 1.0)
+        if (model.numOfCaptureTrack == 2) {
+            createCheckPoints(center: anchorPosition, count: model.numOfCheckpoints, height: secondHeight, radiusScale: 0.866)
+        }
+    }
+    
+    public func findNearestPoint(cameraPosition: SIMD3<Float>, cameraDirection: SIMD3<Float>, anchorPosition: SIMD3<Float>, count: Int) -> Int {
         let angleThreshold: Float = 15.0   // 仰角不能超過30度
-        let distancsThreshold: Float = 0.4
+        let distanceThreshold: Float = 0.4
+        let directionThreshold: Float = 10.0  // 相機朝向和checkpoint角度差
         
         let interval = 360.0 / Float(count)
         
-        var currentCircle: Int = -1   // current locate circle(1, 2)
+        var currentCircle: Int = -1   // current locate circle: 1, 2
         var closestPointIndex:Int = -1
         
         
         // in which height
         if abs(cameraPosition.y - firstHeight) < abs(cameraPosition.y - secondHeight) {
-            print("In first height")
             currentCircle = 1
-        }
-        else {
-            print("In second height")
+        } else {
             currentCircle = 2
         }
         
@@ -95,38 +107,54 @@ class CaptureTrack: Entity, HasAnchoring {
         var cameraAngle = atan2(cameraPos.z, cameraPos.x) * 180 / Float.pi
         if cameraAngle < 0 { cameraAngle += 360 }
         
-        // Vertical angle
-//        let horizonDist = sqrt(cameraPos.z * cameraPos.z + cameraPos.x * cameraPos.x)
-//        let elevationAngle = atan2(cameraPos.y, horizonDist) * 180 / Float.pi  // 仰角
-//        if abs(elevationAngle) > angleThreshold {
-//            print("Camera is too high/low, ignoring closest point.")
-//            return -1
-//        }
-        
         // distance
         let distance = length(cameraPos)
-        if distance > distancsThreshold {
-            print("Camera is too far, ignoring closest point.")
+        if distance > distanceThreshold {
+            self.model.captureError = .distance
+            if(DEBUG) { print("Camera is too far, ignoring closest point.") }
             return -1
         }
+        
+        // camera direction
+        func isDirectionAligned(pointDirection: SIMD3<Float>, cameraDirection: SIMD3<Float>, threshold: Float) -> Bool {
+            let normalizedPointDir = normalize(pointDirection)
+            let normalizedCamDir = normalize(cameraDirection)
+            let dotProduct = dot(normalizedPointDir, normalizedCamDir)
+            
+            // angle between point direction and camera direction
+            let angle = acos(dotProduct) * 180 / Float.pi
+            return abs(angle) <= threshold
+        }
+
         
         if (points.count >= 40) {
 
             switch currentCircle {
             case 1:
+                // vertical angle
                 let baseIndex = Int(round(cameraAngle / interval)) % count
                 let pointPosition = points[baseIndex].position - anchorPosition
                 let horizonDist = sqrt(cameraPos.z * cameraPos.z + cameraPos.x * cameraPos.x)
                 let elevationAngle = atan2(cameraPos.y - pointPosition.y, horizonDist) * 180 / Float.pi
-                
                 if abs(elevationAngle) <= angleThreshold {
-                    closestPointIndex = baseIndex
-                    print("first height point: \(closestPointIndex)")
-                }
-                else {
-                    //print("Camera is too high/low, ignoring closest point.")
+                    if(DEBUG) { print("first height point: \(closestPointIndex)") }
+                } else {
+                    self.model.captureError = .height
+                    if(DEBUG) { print("Camera is too high/low at first height.") }
                     return -1
                 }
+                
+                // camera facing direction
+                let pointDirection = normalize(anchorPosition - pointPosition)
+                if isDirectionAligned(pointDirection: pointDirection, cameraDirection: cameraDirection, threshold: directionThreshold) {
+                    closestPointIndex = baseIndex
+                } else {
+                    self.model.captureError = .notAlign
+                    if(DEBUG) { print("Camera direction does not align with point.") }
+                    return -1
+                }
+                
+                
             case 2:
                 let baseIndex = Int(round(cameraAngle / interval)) % count
                 let pointPosition = points[baseIndex + count].position - anchorPosition
@@ -135,20 +163,21 @@ class CaptureTrack: Entity, HasAnchoring {
                 
                 if abs(elevationAngle) <= angleThreshold {
                     closestPointIndex = baseIndex + count
-                    print("second height point: \(closestPointIndex)")
+                    if(DEBUG) { print("second height point: \(closestPointIndex)") }
                 }
                 else {
-                    print("second height: Camera is too high/low, ignoring closest point.")
+                    self.model.captureError = .height
+                    if(DEBUG) { print("second height: Camera is too high/low at second height.") }
                     return -1
                 }
             default:
                 closestPointIndex = -1
             }
         }
-        // closestPointIndex = Int(round(cameraAngle / interval)) % count // ensure not out of range
-        print("closest point is \(closestPointIndex)")   // 一圈有count個，所以是除以count 然後要再加上距離的判斷
-    
         
+        if(DEBUG) { print("closest point is \(closestPointIndex)") }
+    
+        self.model.captureError = .capturing
         return Int(closestPointIndex)
     }
     
@@ -183,6 +212,12 @@ class CaptureTrack: Entity, HasAnchoring {
             self.cancellable = ModelEntity.loadModelAsync(named: filename)
                 .sink (receiveCompletion: { loadCompletion in
                     // error handle
+                    switch loadCompletion {
+                    case .failure(let error):
+                        print("Error loading \(filename) model: \(error.localizedDescription)")
+                    case .finished:
+                         print("\(filename) model loaded successfully.")
+                    }
                 }, receiveValue: { modelEntity in
                     var material = SimpleMaterial()
                     material.color = .init(tint: .green.withAlphaComponent(0.3))
@@ -207,6 +242,7 @@ class CaptureTrack: Entity, HasAnchoring {
                         continuation.resume()
                     } else {
                         print("Failed to calculate model size.")
+                        continuation.resume()
                     }
                 })
         }
@@ -255,8 +291,7 @@ class CaptureTrack: Entity, HasAnchoring {
     }
     
     private func createCheckPoints(center: SIMD3<Float>, count: Int, height: Float, radiusScale: Float) {
-        self.count = count
-        
+
         let fullCircle = Float.pi * 2
         let angleIncrement = fullCircle / Float(count)
         
